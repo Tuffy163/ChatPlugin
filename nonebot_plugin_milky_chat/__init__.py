@@ -65,7 +65,7 @@ async def on_startup():
 
     client = ChatClient(config)
 
-    import nonebot_plugin_milky_chat.commands as cmds
+    from . import commands as cmds
     cmds.client = client
 
     logger.info(f"Milky Chat 插件已启动 | API: {config.chat_api_base} | 模型: {config.chat_model}")
