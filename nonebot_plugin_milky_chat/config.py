@@ -1,6 +1,7 @@
 """插件配置 — 所有配置项支持通过环境变量或 .env 文件设置"""
 
-from pydantic import BaseModel, Field
+from typing import Any, Union
+from pydantic import BaseModel, Field, field_validator
 
 
 class ChatConfig(BaseModel):
@@ -43,6 +44,11 @@ class ChatConfig(BaseModel):
         default="",
         description="允许响应的 QQ 号，逗号分隔。留空则不限制",
     )
+
+    @field_validator("chat_allow_groups", "chat_allow_users", mode="before")
+    @classmethod
+    def _coerce_to_str(cls, v: Any) -> str:
+        return str(v) if v is not None else ""
 
     @property
     def allow_group_set(self) -> set[str]:
