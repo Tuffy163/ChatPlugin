@@ -3,6 +3,7 @@
 from enum import Enum
 from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator
+from nonebot.log import logger
 
 
 class ApiType(str, Enum):
@@ -92,9 +93,11 @@ class ChatConfig(BaseModel):
 
             data = json.loads(self.chat_apis)
             if not isinstance(data, list):
+                logger.warning(f"CHAT_APIS 应为 JSON 列表格式，当前类型: {type(data).__name__}")
                 return []
             return [ApiProfile(**item) for item in data]
-        except (json.JSONDecodeError, TypeError, ValueError):
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            logger.warning(f"CHAT_APIS 配置解析失败: {e}\n原始值: {self.chat_apis}")
             return []
 
     def get_active_profile(self) -> Optional[ApiProfile]:

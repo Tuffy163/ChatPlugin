@@ -186,7 +186,12 @@ class ChatClient:
         response = await client.post(self._current_chat_endpoint, json=body)
         response.raise_for_status()
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        try:
+            return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as e:
+            from nonebot.log import logger
+            logger.error(f"OpenAI 响应格式异常: {e}\n原始响应: {data}")
+            raise RuntimeError(f"OpenAI 响应解析失败: {e}") from e
 
     async def _chat_anthropic(self, messages: list[dict]) -> str:
         """Anthropic 协议: POST /v1/messages"""
@@ -218,7 +223,9 @@ class ChatClient:
             if block.get("type") == "text":
                 return block["text"]
 
-        raise RuntimeError("响应中没有 text 块")
+        from nonebot.log import logger
+        logger.error(f"Anthropic 响应中没有 text 块，原始响应: {data}")
+        raise RuntimeError(f"Anthropic 响应中没有 text 块，content: {data.get('content')}")
 
     async def chat_stream(self, messages: list[dict]):
         """流式发送消息，逐块 yield 回复文本"""

@@ -82,13 +82,23 @@ def _model_label() -> str:
     return client.current_model
 
 
+def _build_reply(event: Event, text: str):
+    """构建引用回复消息。Milky 适配器用 MessageSegment.reply() 构造"""
+    from nonebot.adapters.milky.message import MessageSegment as MilkySeg
+
+    msg_id = getattr(event, "message_id", None)
+    if msg_id is not None:
+        return MilkySeg.reply(msg_id) + MilkySeg.text(text)
+    return text
+
+
 @chat_handler.handle()
 async def handle_chat(event: Event):
     """@bot 任意消息直接对话，单轮无上下文"""
     user_msg = event.get_plaintext().strip()
 
     if not user_msg:
-        await chat_handler.finish("@我有什么事吗？直接说就行~")
+        await chat_handler.finish(_build_reply(event, "@我有什么事吗？直接说就行~"))
         return
 
     messages = [
@@ -98,16 +108,16 @@ async def handle_chat(event: Event):
 
     try:
         reply = await client.chat(messages)
-        await chat_handler.finish(reply)
+        await chat_handler.finish(_build_reply(event, reply))
     except FinishedException:
         raise
     except Exception as e:
         logger.error(f"API 调用失败: {e}")
-        await chat_handler.finish("抱歉，AI 服务暂时不可用，请稍后再试。")
+        await chat_handler.finish(_build_reply(event, "抱歉，AI 服务暂时不可用，请稍后再试。"))
 
 
 @model_cmd.handle()
-async def handle_model(arg: Message = CommandArg()):
+async def handle_model(event: Event, arg: Message = CommandArg()):
     """@bot /model [名称] — 无参数查看模型列表，有参数切换"""
     model_name = arg.extract_plain_text().strip()
 
@@ -120,29 +130,32 @@ async def handle_model(arg: Message = CommandArg()):
             extra = "" if len(models) <= 20 else f"\n  ... 还有 {len(models) - 20} 个"
             source = "(API 查询)"
             await model_cmd.finish(
-                f"当前模型: {current}\n\n可用模型 {source} ({len(models)}):\n{lines}{extra}"
+                _build_reply(event, f"当前模型: {current}\n\n可用模型 {source} ({len(models)}):\n{lines}{extra}")
             )
         else:
             await model_cmd.finish(
-                f"当前模型: {current}\n\n无法获取可用模型列表（当前 API 不支持或网络错误）"
+                _build_reply(event, f"当前模型: {current}\n\n无法获取可用模型列表（当前 API 不支持或网络错误）")
             )
         return
 
     client.current_model = model_name
     current = _model_label()
-    await model_cmd.finish(f"✅ 已切换模型为: {current}")
+    await model_cmd.finish(_build_reply(event, f"✅ 已切换模型为: {current}"))
 
 
 @api_cmd.handle()
-async def handle_api(arg: Message = CommandArg()):
+async def handle_api(event: Event, arg: Message = CommandArg()):
     """@bot /api [名称] — 无参数查看 API 列表，有参数切换 API"""
     api_name = arg.extract_plain_text().strip()
 
     if not client.configured:
         await api_cmd.finish(
-            "⚠️ 插件未配置 API。\n"
-            "请在 .env 中设置 CHAT_APIS，例如:\n"
-            '[{"name":"OpenAI","type":"openai","base":"https://api.openai.com","key":"sk-xxx","model":"gpt-4o"}]'
+            _build_reply(
+                event,
+                "⚠️ 插件未配置 API。\n"
+                "请在 .env 中设置 CHAT_APIS，例如:\n"
+                '[{"name":"OpenAI","type":"openai","base":"https://api.openai.com","key":"sk-xxx","model":"gpt-4o"}]',
+            )
         )
         return
 
@@ -151,14 +164,17 @@ async def handle_api(arg: Message = CommandArg()):
         current = client.current_api_name
         apis = client.api_list
         lines = "\n".join(
-            f"  {'●' if a['name'] == current else '○'} {a['name']} ({a['type']}) — {a['base']} [{a['model']}]"
+            f"  {'●' if a['name'] == current else '○'} {a['name']} ({a['type']}) [{a['model']}]"
             for a in apis
         )
         await api_cmd.finish(
-            f"当前 API: {current} ({client.current_api_type.value})\n"
-            f"模型: {client.current_model}\n\n"
-            f"可用 API ({len(apis)}):\n{lines}\n\n"
-            f"使用 @bot /api <名称> 切换"
+            _build_reply(
+                event,
+                f"当前 API: {current} ({client.current_api_type.value})\n"
+                f"模型: {client.current_model}\n\n"
+                f"可用 API ({len(apis)}):\n{lines}\n\n"
+                f"使用 @bot /api <名称> 切换",
+            )
         )
         return
 
@@ -166,28 +182,33 @@ async def handle_api(arg: Message = CommandArg()):
     success = await client.switch_api(api_name)
     if success:
         await api_cmd.finish(
-            f"✅ 已切换 API 为: {client.current_api_name}\n"
-            f"   类型: {client.current_api_type.value}\n"
-            f"   模型: {client.current_model}\n"
-            f"   地址: {client.current_api_base}"
+            _build_reply(
+                event,
+                f"✅ 已切换 API 为: {client.current_api_name}\n"
+                f"   类型: {client.current_api_type.value}\n"
+                f"   模型: {client.current_model}",
+            )
         )
     else:
         names = ", ".join(a["name"] for a in client.api_list)
-        await api_cmd.finish(f"❌ 未找到 API「{api_name}」。可用: {names}")
+        await api_cmd.finish(_build_reply(event, f"❌ 未找到 API「{api_name}」。可用: {names}"))
 
 
 @help_cmd.handle()
-async def handle_help():
+async def handle_help(event: Event):
     """@bot /help — 查看帮助"""
 
     await help_cmd.finish(
-        "🤖 Milky Chat 帮助:\n"
-        "━━━━━━━━━━━━━━\n"
-        "@bot <消息>          直接对话 (单轮)\n"
-        "@bot /model          查看可用模型\n"
-        "@bot /model <名称>    切换模型\n"
-        "@bot /api            查看可用 API\n"
-        "@bot /api <名称>       切换 API\n"
-        "@bot /help           查看此帮助\n"
-        "━━━━━━━━━━━━━━"
+        _build_reply(
+            event,
+            "🤖 Milky Chat 帮助:\n"
+            "━━━━━━━━━━━━━━\n"
+            "@bot <消息>          直接对话 (单轮)\n"
+            "@bot /model          查看可用模型\n"
+            "@bot /model <名称>    切换模型\n"
+            "@bot /api            查看可用 API\n"
+            "@bot /api <名称>       切换 API\n"
+            "@bot /help           查看此帮助\n"
+            "━━━━━━━━━━━━━━",
+        )
     )
