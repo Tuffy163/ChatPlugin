@@ -42,6 +42,10 @@ class ChatConfig(BaseModel):
         default="你是一个友好、乐于助人的 AI 助手。请用简洁清晰的语言回答用户的问题。",
         description="系统提示词，定义 AI 的角色和行为",
     )
+    chat_temperature: Optional[float] = Field(
+        default=None,
+        description="Temperature 参数，控制回复的随机性 (0.0~2.0)。留空则不设置，使用 API 默认值",
+    )
 
     # === 功能开关 ===
     chat_vision_enabled: bool = Field(

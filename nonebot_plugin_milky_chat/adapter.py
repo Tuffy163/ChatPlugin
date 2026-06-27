@@ -276,6 +276,8 @@ class ChatClient:
             "model": self.current_model,
             "messages": messages,
         }
+        if self.config.chat_temperature is not None:
+            body["temperature"] = self.config.chat_temperature
         response = await client.post(self._current_chat_endpoint, json=body)
         response.raise_for_status()
         data = response.json()
@@ -307,6 +309,8 @@ class ChatClient:
             "max_tokens": DEFAULT_MAX_TOKENS,
             "messages": user_messages,
         }
+        if self.config.chat_temperature is not None:
+            body["temperature"] = self.config.chat_temperature
         if system_prompt:
             body["system"] = system_prompt
 
@@ -346,6 +350,8 @@ class ChatClient:
             "messages": messages,
             "stream": True,
         }
+        if self.config.chat_temperature is not None:
+            body["temperature"] = self.config.chat_temperature
         async with client.stream("POST", self._current_chat_endpoint, json=body) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
@@ -385,6 +391,8 @@ class ChatClient:
             "messages": user_messages,
             "stream": True,
         }
+        if self.config.chat_temperature is not None:
+            body["temperature"] = self.config.chat_temperature
         if system_prompt:
             body["system"] = system_prompt
 

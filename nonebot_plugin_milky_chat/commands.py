@@ -150,11 +150,9 @@ async def handle_model(event: Event, arg: Message = CommandArg()):
         models = await _get_models()
 
         if models:
-            lines = "\n".join(f"  • {m}" for m in models[:20])
-            extra = "" if len(models) <= 20 else f"\n  ... 还有 {len(models) - 20} 个"
-            source = "(API 查询)"
+            lines = "\n".join(f"  • {m}" for m in models)
             await model_cmd.finish(
-                _build_reply(event, f"当前模型: {current}\n\n可用模型 {source} ({len(models)}):\n{lines}{extra}")
+                _build_reply(event, f"当前模型: {current}\n\n可用模型 (API 查询) ({len(models)}):\n{lines}")
             )
         else:
             await model_cmd.finish(

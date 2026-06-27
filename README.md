@@ -66,6 +66,9 @@ CHAT_ALLOW_USERS=
 
 # 识图功能 (可选，默认=True，设为 False 关闭)
 CHAT_VISION_ENABLED=True
+
+# Temperature 参数 (可选，0.0~2.0，留空使用 API 默认值)
+CHAT_TEMPERATURE=
 ```
 
 ## 🚀 使用
