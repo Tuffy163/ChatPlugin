@@ -96,6 +96,3 @@ nonebot_plugin_milky_chat/
 └── commands.py      # 命令处理器
 ```
 
-## 📄 License
-
-MIT

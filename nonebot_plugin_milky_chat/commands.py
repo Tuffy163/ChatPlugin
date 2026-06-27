@@ -125,8 +125,6 @@ async def handle_model(arg: Message = CommandArg()):
 @help_cmd.handle()
 async def handle_help():
     """@bot /help — 查看帮助"""
-    models = await _get_models()
-    model_list_str = ", ".join(models[:6]) if models else "取决于 API"
 
     await help_cmd.finish(
         f"🤖 Milky Chat 帮助:\n"
@@ -135,7 +133,5 @@ async def handle_help():
         f"@bot /model          查看可用模型\n"
         f"@bot /model <名称>    切换模型\n"
         f"@bot /help           查看此帮助\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"当前模型: {client.config.chat_model}\n"
-        f"可选模型: {model_list_str}"
+        f"━━━━━━━━━━━━━━"
     )
