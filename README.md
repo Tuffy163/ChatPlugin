@@ -25,7 +25,7 @@ CHAT_API_KEY=sk-your-api-key-here
 CHAT_MODEL=gpt-3.5-turbo
 
 # 对话 endpoint (可选，默认 /chat/completions)
-CHAT_CHAT_ENDPOINT=/chat/completions
+CHAT_ENDPOINT=/chat/completions
 
 # 模型列表 endpoint (可选，默认 /models)
 CHAT_MODELS_ENDPOINT=/models
@@ -46,8 +46,6 @@ CHAT_ALLOW_USERS=
 
 ```bash
 nb run
-# 或
-python bot.py
 ```
 
 ### 命令列表
