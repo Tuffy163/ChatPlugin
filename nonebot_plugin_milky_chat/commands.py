@@ -16,6 +16,7 @@ client: ChatClient = None  # type: ignore
 
 # ---- 自定义规则: to_me + 白名单 ----
 
+
 def _extract_ids(event: Event) -> tuple[str, str]:
     """适配器无关地提取 (用户ID, 群号)。群号取不到时为 ""。
 
@@ -61,15 +62,24 @@ CHAT_RULE = Rule(_chat_rule)
 # ---- 注册 ----
 
 model_cmd = on_command("model", rule=CHAT_RULE, priority=1, block=True)
+api_cmd = on_command("api", rule=CHAT_RULE, priority=1, block=True)
 help_cmd = on_command("help", rule=CHAT_RULE, priority=1, block=True)
 chat_handler = on_message(rule=CHAT_RULE, priority=10, block=True)
 
 
 # ---- 处理器 ----
 
+
 async def _get_models() -> list[str]:
-    """从 API 获取可用模型列表"""
+    """从当前 API 获取可用模型列表"""
     return await client.list_models()
+
+
+def _model_label() -> str:
+    """生成当前模型显示文本，多 API 时显示 API名/模型"""
+    if len(client.api_list) > 1:
+        return f"{client.current_api_name}/{client.current_model}"
+    return client.current_model
 
 
 @chat_handler.handle()
@@ -92,8 +102,8 @@ async def handle_chat(event: Event):
     except FinishedException:
         raise
     except Exception as e:
-        logger.error(f"Milky API 调用失败: {e}")
-        await chat_handler.finish(f"抱歉，AI 服务暂时不可用: {type(e).__name__}")
+        logger.error(f"API 调用失败: {e}")
+        await chat_handler.finish("抱歉，AI 服务暂时不可用，请稍后再试。")
 
 
 @model_cmd.handle()
@@ -102,7 +112,7 @@ async def handle_model(arg: Message = CommandArg()):
     model_name = arg.extract_plain_text().strip()
 
     if not model_name:
-        current = client.config.chat_model
+        current = _model_label()
         models = await _get_models()
 
         if models:
@@ -114,12 +124,56 @@ async def handle_model(arg: Message = CommandArg()):
             )
         else:
             await model_cmd.finish(
-                f"当前模型: {current}\n\n无法获取可用模型列表（API 不支持或网络错误）"
+                f"当前模型: {current}\n\n无法获取可用模型列表（当前 API 不支持或网络错误）"
             )
         return
 
-    client.config.chat_model = model_name
-    await model_cmd.finish(f"✅ 已切换模型为: {model_name}")
+    client.current_model = model_name
+    current = _model_label()
+    await model_cmd.finish(f"✅ 已切换模型为: {current}")
+
+
+@api_cmd.handle()
+async def handle_api(arg: Message = CommandArg()):
+    """@bot /api [名称] — 无参数查看 API 列表，有参数切换 API"""
+    api_name = arg.extract_plain_text().strip()
+
+    if not client.configured:
+        await api_cmd.finish(
+            "⚠️ 插件未配置 API。\n"
+            "请在 .env 中设置 CHAT_APIS，例如:\n"
+            '[{"name":"OpenAI","type":"openai","base":"https://api.openai.com","key":"sk-xxx","model":"gpt-4o"}]'
+        )
+        return
+
+    if not api_name:
+        # 查看 API 列表
+        current = client.current_api_name
+        apis = client.api_list
+        lines = "\n".join(
+            f"  {'●' if a['name'] == current else '○'} {a['name']} ({a['type']}) — {a['base']} [{a['model']}]"
+            for a in apis
+        )
+        await api_cmd.finish(
+            f"当前 API: {current} ({client.current_api_type.value})\n"
+            f"模型: {client.current_model}\n\n"
+            f"可用 API ({len(apis)}):\n{lines}\n\n"
+            f"使用 @bot /api <名称> 切换"
+        )
+        return
+
+    # 切换 API
+    success = await client.switch_api(api_name)
+    if success:
+        await api_cmd.finish(
+            f"✅ 已切换 API 为: {client.current_api_name}\n"
+            f"   类型: {client.current_api_type.value}\n"
+            f"   模型: {client.current_model}\n"
+            f"   地址: {client.current_api_base}"
+        )
+    else:
+        names = ", ".join(a["name"] for a in client.api_list)
+        await api_cmd.finish(f"❌ 未找到 API「{api_name}」。可用: {names}")
 
 
 @help_cmd.handle()
@@ -127,11 +181,13 @@ async def handle_help():
     """@bot /help — 查看帮助"""
 
     await help_cmd.finish(
-        f"🤖 Milky Chat 帮助:\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"@bot <消息>          直接对话 (单轮)\n"
-        f"@bot /model          查看可用模型\n"
-        f"@bot /model <名称>    切换模型\n"
-        f"@bot /help           查看此帮助\n"
-        f"━━━━━━━━━━━━━━"
+        "🤖 Milky Chat 帮助:\n"
+        "━━━━━━━━━━━━━━\n"
+        "@bot <消息>          直接对话 (单轮)\n"
+        "@bot /model          查看可用模型\n"
+        "@bot /model <名称>    切换模型\n"
+        "@bot /api            查看可用 API\n"
+        "@bot /api <名称>       切换 API\n"
+        "@bot /help           查看此帮助\n"
+        "━━━━━━━━━━━━━━"
     )

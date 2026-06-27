@@ -1,17 +1,19 @@
 """nonebot-plugin-milky-chat — NoneBot AI 聊天插件
 
-内置 ChatClient，支持自定义:
-- 对话 API 地址 (OpenAI 兼容格式)
-- 模型选择
+内置 ChatClient，支持:
+- 多 API 配置与运行时切换
+- OpenAI / Anthropic 双协议自动适配
+- 模型选择 (每 API 独立追踪)
 - 系统提示词
 
 命令:
     @bot <任意消息>       — 直接对话 (单轮, 无上下文)
     @bot /model [名称]    — 查看可用模型 / 切换模型
+    @bot /api [名称]      — 查看可用 API / 切换 API
     @bot /help           — 查看帮助
 
 配置方式:
-    环境变量 / .env 文件，前缀 CHAT_
+    .env 中设置 CHAT_APIS (JSON 列表)，每项含 name/type/base/key/model
     详见 .env.example
 """
 
@@ -24,8 +26,8 @@ from .adapter import ChatClient
 # ---- 插件元数据 ----
 __plugin_meta__ = PluginMetadata(
     name="Milky Chat",
-    description="AI 对话插件，支持自定义 API、模型和提示词",
-    usage="@bot <消息> — 直接对话\n@bot /model — 查看/切换模型\n@bot /help — 帮助",
+    description="AI 对话插件，支持 OpenAI/Anthropic 双协议，多 API 运行时切换",
+    usage="@bot <消息> — 直接对话\n@bot /model — 查看/切换模型\n@bot /api — 查看/切换 API\n@bot /help — 帮助",
     type="application",
     homepage="https://github.com/example/nonebot-plugin-milky-chat",
     config=ChatConfig,
@@ -49,9 +51,8 @@ async def on_startup():
     nb_config = driver.config
 
     config = ChatConfig(
-        chat_api_base=getattr(nb_config, "chat_api_base", "https://api.openai.com/v1"),
-        chat_api_key=getattr(nb_config, "chat_api_key", "sk-xxx"),
-        chat_model=getattr(nb_config, "chat_model", "gpt-3.5-turbo"),
+        chat_apis=getattr(nb_config, "chat_apis", ""),
+        chat_default_api=getattr(nb_config, "chat_default_api", ""),
         chat_system_prompt=getattr(
             nb_config,
             "chat_system_prompt",
@@ -59,8 +60,6 @@ async def on_startup():
         ),
         chat_allow_groups=getattr(nb_config, "chat_allow_groups", ""),
         chat_allow_users=getattr(nb_config, "chat_allow_users", ""),
-        chat_endpoint=getattr(nb_config, "chat_endpoint", "/chat/completions"),
-        chat_models_endpoint=getattr(nb_config, "chat_models_endpoint", "/models"),
     )
 
     client = ChatClient(config)
@@ -68,7 +67,15 @@ async def on_startup():
     from . import commands as cmds
     cmds.client = client
 
-    logger.info(f"Milky Chat 插件已启动 | API: {config.chat_api_base} | 模型: {config.chat_model}")
+    if client.configured:
+        apis = client.api_list
+        logger.info(
+            f"Milky Chat 插件已启动 | {len(apis)} 个 API: "
+            + ", ".join(f"{a['name']}({a['type']})" for a in apis)
+            + f" | 当前: {client.current_api_name}/{client.current_model}"
+        )
+    else:
+        logger.warning("Milky Chat 插件已启动 | ⚠️ 未配置 CHAT_APIS，请检查 .env")
 
 
 @driver.on_shutdown
