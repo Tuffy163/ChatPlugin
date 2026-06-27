@@ -4,6 +4,7 @@
 from nonebot import on_command, on_message
 from nonebot.rule import Rule
 from nonebot.adapters import Event, Message
+from nonebot.exception import FinishedException
 from nonebot.params import CommandArg
 from nonebot.log import logger
 
@@ -15,6 +16,27 @@ client: ChatClient = None  # type: ignore
 
 # ---- 自定义规则: to_me + 白名单 ----
 
+def _extract_ids(event: Event) -> tuple[str, str]:
+    """适配器无关地提取 (用户ID, 群号)。群号取不到时为 ""。
+
+    - 用户ID: 优先 NoneBot 标准的 event.get_user_id()（所有适配器都实现）
+    - 群号: 优先 OneBot 风格的 event.group_id；
+            否则取 Milky 的 event.data.peer_id（仅当 message_scene == "group"）
+    """
+    try:
+        uid = event.get_user_id()
+    except Exception:
+        uid = str(getattr(event, "user_id", "") or "")
+
+    gid = str(getattr(event, "group_id", "") or "")
+    if not gid:
+        data = getattr(event, "data", None)
+        if data is not None and getattr(data, "message_scene", None) == "group":
+            gid = str(getattr(data, "peer_id", "") or "")
+
+    return uid, gid
+
+
 async def _chat_rule(event: Event) -> bool:
     """只有 @bot 且 在白名单内（若设置了白名单）才响应"""
     if not event.is_tome():
@@ -25,8 +47,7 @@ async def _chat_rule(event: Event) -> bool:
     if not group_set and not user_set:
         return True
 
-    uid = str(getattr(event, "user_id", ""))
-    gid = str(getattr(event, "group_id", ""))
+    uid, gid = _extract_ids(event)
 
     if gid:
         return gid in group_set or uid in user_set
@@ -68,6 +89,8 @@ async def handle_chat(event: Event):
     try:
         reply = await client.chat(messages)
         await chat_handler.finish(reply)
+    except FinishedException:
+        raise
     except Exception as e:
         logger.error(f"Milky API 调用失败: {e}")
         await chat_handler.finish(f"抱歉，AI 服务暂时不可用: {type(e).__name__}")
@@ -114,7 +137,5 @@ async def handle_help():
         f"@bot /help           查看此帮助\n"
         f"━━━━━━━━━━━━━━\n"
         f"当前模型: {client.config.chat_model}\n"
-        f"可选模型: {model_list_str}\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"提示词: {client.config.chat_system_prompt[:50]}..."
+        f"可选模型: {model_list_str}"
     )
