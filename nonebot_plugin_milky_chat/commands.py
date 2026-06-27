@@ -61,7 +61,7 @@ async def handle_chat(event: Event):
         return
 
     messages = [
-        {"role": "system", "content": client.config.milky_system_prompt},
+        {"role": "system", "content": client.config.chat_system_prompt},
         {"role": "user", "content": user_msg},
     ]
 
@@ -79,7 +79,7 @@ async def handle_model(arg: Message = CommandArg()):
     model_name = arg.extract_plain_text().strip()
 
     if not model_name:
-        current = client.config.milky_model
+        current = client.config.chat_model
         models = await _get_models()
 
         if models:
@@ -95,7 +95,7 @@ async def handle_model(arg: Message = CommandArg()):
             )
         return
 
-    client.config.milky_model = model_name
+    client.config.chat_model = model_name
     await model_cmd.finish(f"✅ 已切换模型为: {model_name}")
 
 
@@ -113,8 +113,8 @@ async def handle_help():
         f"@bot /model <名称>    切换模型\n"
         f"@bot /help           查看此帮助\n"
         f"━━━━━━━━━━━━━━\n"
-        f"当前模型: {client.config.milky_model}\n"
+        f"当前模型: {client.config.chat_model}\n"
         f"可选模型: {model_list_str}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"提示词: {client.config.milky_system_prompt[:50]}..."
+        f"提示词: {client.config.chat_system_prompt[:50]}..."
     )

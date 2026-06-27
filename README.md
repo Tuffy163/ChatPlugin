@@ -16,22 +16,28 @@
 
 ```env
 # API 地址 (必填，支持任何 OpenAI 兼容接口)
-MILKY_API_BASE=https://api.openai.com/v1
+CHAT_API_BASE=https://api.openai.com/v1
 
 # API 密钥 (必填)
-MILKY_API_KEY=sk-your-api-key-here
+CHAT_API_KEY=sk-your-api-key-here
 
 # 模型名称 (可选，默认 gpt-3.5-turbo)
-MILKY_MODEL=gpt-3.5-turbo
+CHAT_MODEL=gpt-3.5-turbo
+
+# 对话 endpoint (可选，默认 /chat/completions)
+CHAT_CHAT_ENDPOINT=/chat/completions
+
+# 模型列表 endpoint (可选，默认 /models)
+CHAT_MODELS_ENDPOINT=/models
 
 # 系统提示词 (可选)
-MILKY_SYSTEM_PROMPT=你是一个友好、乐于助人的 AI 助手。请用简洁清晰的语言回答用户的问题。
+CHAT_SYSTEM_PROMPT=你是一个友好、乐于助人的 AI 助手。请用简洁清晰的语言回答用户的问题。
 
 # 允许响应的 QQ 群号，逗号分隔 (可选，留空=所有群)
-MILKY_ALLOW_GROUPS=
+CHAT_ALLOW_GROUPS=
 
 # 允许响应的 QQ 号，逗号分隔 (可选，留空=所有人)
-MILKY_ALLOW_USERS=
+CHAT_ALLOW_USERS=
 ```
 
 ## 🚀 使用

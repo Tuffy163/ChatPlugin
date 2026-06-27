@@ -11,7 +11,7 @@
     @bot /help           — 查看帮助
 
 配置方式:
-    环境变量 / .env 文件，前缀 MILKY_
+    环境变量 / .env 文件，前缀 CHAT_
     详见 .env.example
 """
 
@@ -49,25 +49,26 @@ async def on_startup():
     nb_config = driver.config
 
     config = ChatConfig(
-        milky_api_base=getattr(nb_config, "milky_api_base", "https://api.openai.com/v1"),
-        milky_api_key=getattr(nb_config, "milky_api_key", "sk-xxx"),
-        milky_model=getattr(nb_config, "milky_model", "gpt-3.5-turbo"),
-        milky_system_prompt=getattr(
+        chat_api_base=getattr(nb_config, "chat_api_base", "https://api.openai.com/v1"),
+        chat_api_key=getattr(nb_config, "chat_api_key", "sk-xxx"),
+        chat_model=getattr(nb_config, "chat_model", "gpt-3.5-turbo"),
+        chat_system_prompt=getattr(
             nb_config,
-            "milky_system_prompt",
+            "chat_system_prompt",
             "你是一个友好、乐于助人的 AI 助手。请用简洁清晰的语言回答用户的问题。",
         ),
-        milky_allow_groups=getattr(nb_config, "milky_allow_groups", ""),
-        milky_allow_users=getattr(nb_config, "milky_allow_users", ""),
+        chat_allow_groups=getattr(nb_config, "chat_allow_groups", ""),
+        chat_allow_users=getattr(nb_config, "chat_allow_users", ""),
+        chat_endpoint=getattr(nb_config, "chat_endpoint", "/chat/completions"),
+        chat_models_endpoint=getattr(nb_config, "chat_models_endpoint", "/models"),
     )
 
     client = ChatClient(config)
 
-    # 注入到 commands 模块
     import nonebot_plugin_milky_chat.commands as cmds
     cmds.client = client
 
-    logger.info(f"Milky Chat 插件已启动 | API: {config.milky_api_base} | 模型: {config.milky_model}")
+    logger.info(f"Milky Chat 插件已启动 | API: {config.chat_api_base} | 模型: {config.chat_model}")
 
 
 @driver.on_shutdown

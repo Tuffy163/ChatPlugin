@@ -23,9 +23,9 @@ class ChatClient:
         """获取或创建持久化的 httpx 客户端"""
         if self._client is None:
             self._client = httpx.AsyncClient(
-                base_url=self.config.milky_api_base.rstrip("/"),
+                base_url=self.config.chat_api_base.rstrip("/"),
                 headers={
-                    "Authorization": f"Bearer {self.config.milky_api_key}",
+                    "Authorization": f"Bearer {self.config.chat_api_key}",
                     "Content-Type": "application/json",
                 },
                 timeout=httpx.Timeout(60.0),
@@ -33,55 +33,31 @@ class ChatClient:
         return self._client
 
     async def chat(self, messages: list[dict]) -> str:
-        """发送消息并返回 AI 回复文本
-
-        Args:
-            messages: 符合 OpenAI 格式的消息列表
-                      [{"role": "system"|"user"|"assistant", "content": "..."}]
-
-        Returns:
-            AI 回复的文本内容
-
-        Raises:
-            httpx.HTTPError: 网络或 API 错误
-        """
+        """发送消息并返回 AI 回复文本"""
         client = await self._get_client()
 
         body = {
-            "model": self.config.milky_model,
+            "model": self.config.chat_model,
             "messages": messages,
         }
 
-        if self.config.milky_extra_body:
-            body.update(self.config.milky_extra_body)
-
-        response = await client.post("/chat/completions", json=body)
+        response = await client.post(self.config.chat_endpoint, json=body)
         response.raise_for_status()
 
         data = response.json()
         return data["choices"][0]["message"]["content"]
 
     async def chat_stream(self, messages: list[dict]):
-        """流式发送消息，逐块 yield 回复文本
-
-        Args:
-            messages: 消息列表
-
-        Yields:
-            str: 每次 yield 一段增量文本
-        """
+        """流式发送消息，逐块 yield 回复文本"""
         client = await self._get_client()
 
         body = {
-            "model": self.config.milky_model,
+            "model": self.config.chat_model,
             "messages": messages,
             "stream": True,
         }
 
-        if self.config.milky_extra_body:
-            body.update(self.config.milky_extra_body)
-
-        async with client.stream("POST", "/chat/completions", json=body) as response:
+        async with client.stream("POST", self.config.chat_endpoint, json=body) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
                 if line.startswith("data: "):
@@ -102,7 +78,7 @@ class ChatClient:
         """获取 API 可用模型列表"""
         client = await self._get_client()
         try:
-            response = await client.get("/models")
+            response = await client.get(self.config.chat_models_endpoint)
             response.raise_for_status()
             data = response.json()
             return [m["id"] for m in data.get("data", [])]
