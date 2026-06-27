@@ -94,16 +94,40 @@ def _build_reply(event: Event, text: str):
 
 @chat_handler.handle()
 async def handle_chat(event: Event):
-    """@bot 任意消息直接对话，单轮无上下文"""
-    user_msg = event.get_plaintext().strip()
+    """@bot 任意消息直接对话，单轮无上下文；支持图文混排"""
+    # 按消息段原始顺序遍历，保持图文交错顺序
+    content: list[dict] = []
+    for seg in event.message:
+        if seg.type == "text":
+            text = seg.data.get("text", "").strip()
+            if text:
+                content.append({"type": "text", "text": text})
+        elif seg.type == "image" and client.config.chat_vision_enabled:
+            if seg.data.get("sub_type") != "sticker":
+                url = seg.data.get("temp_url", "")
+                if url:
+                    content.append({"type": "image_url", "image_url": {"url": url}})
 
-    if not user_msg:
+    if not content:
         await chat_handler.finish(_build_reply(event, "@我有什么事吗？直接说就行~"))
         return
 
+    # 有图片时确保至少有一个 text 块（API 要求）
+    has_image = any(b.get("type") == "image_url" for b in content)
+    if has_image:
+        has_text = any(b.get("type") == "text" for b in content)
+        if not has_text:
+            content.insert(0, {"type": "text", "text": "请描述这张图片的内容"})
+
+    # 纯文本一条: 用字符串保持兼容；多模态: 用数组
+    if len(content) == 1 and content[0]["type"] == "text":
+        user_content: str | list[dict] = content[0]["text"]
+    else:
+        user_content = content
+
     messages = [
         {"role": "system", "content": client.config.chat_system_prompt},
-        {"role": "user", "content": user_msg},
+        {"role": "user", "content": user_content},
     ]
 
     try:
@@ -204,6 +228,8 @@ async def handle_help(event: Event):
             "🤖 Milky Chat 帮助:\n"
             "━━━━━━━━━━━━━━\n"
             "@bot <消息>          直接对话 (单轮)\n"
+            "@bot <图片>          识图分析\n"
+            "@bot <文字+图片>      图文对话\n"
             "@bot /model          查看可用模型\n"
             "@bot /model <名称>    切换模型\n"
             "@bot /api            查看可用 API\n"

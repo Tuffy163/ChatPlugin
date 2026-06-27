@@ -1,5 +1,6 @@
 """ChatClient — 封装 OpenAI / Anthropic API 的异步 HTTP 通信层，支持多 API 运行时切换"""
 
+import base64
 from typing import Optional
 import httpx
 
@@ -20,6 +21,53 @@ ENDPOINT_MAP = {
 
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_MAX_TOKENS = 4096
+
+
+def _convert_content_to_anthropic(content):
+    """将 OpenAI 兼容的多模态 content 转为 Anthropic 格式。
+
+    OpenAI HTTP URL:  {"type": "image_url", "image_url": {"url": "https://..."}}
+    OpenAI data URI:  {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}
+    Anthropic URL:    {"type": "image", "source": {"type": "url", "url": "...", "media_type": "..."}}
+    Anthropic base64:  {"type": "image", "source": {"type": "base64", "media_type": "...", "data": "..."}}
+
+    纯文本 content 或纯文本块原样返回。
+    """
+    if isinstance(content, str):
+        return content
+
+    if not isinstance(content, list):
+        return content
+
+    converted = []
+    for block in content:
+        if block.get("type") == "image_url":
+            url = block.get("image_url", {}).get("url", "")
+            if url.startswith("data:"):
+                # data:<media_type>;base64,<b64data>
+                meta, b64data = url[len("data:"):].split(",", 1)
+                media_type = meta.split(";")[0]
+                converted.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": b64data,
+                    },
+                })
+            else:
+                converted.append({
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": url,
+                        "media_type": "image/jpeg",
+                    },
+                })
+        else:
+            converted.append(block)
+
+    return converted
 
 
 class ChatClient:
@@ -164,12 +212,57 @@ class ChatClient:
             )
         return self._client
 
+    # ---- 图片预处理 ----
+
+    async def _resolve_image_url(self, url: str) -> str:
+        """将 HTTP 图片 URL 下载并转为 data URI。已是 data: 则原样返回。"""
+        if url.startswith("data:"):
+            return url
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(30.0),
+                follow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0"},
+            ) as dl:
+                response = await dl.get(url)
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "image/jpeg")
+                b64 = base64.b64encode(response.content).decode("ascii")
+                return f"data:{content_type};base64,{b64}"
+        except Exception as e:
+            from nonebot.log import logger
+            logger.warning(f"图片下载失败 ({url[:100]}...): {e!r}")
+            return url  # 降级：返回原始 URL
+
+    async def _resolve_messages(self, messages: list[dict]) -> list[dict]:
+        """下载消息中所有 HTTP 图片 URL 并替换为 data URI"""
+        resolved = []
+        for m in messages:
+            content = m.get("content")
+            if isinstance(content, list):
+                new_content = []
+                for block in content:
+                    if block.get("type") == "image_url":
+                        img_url = block.get("image_url", {}).get("url", "")
+                        new_url = await self._resolve_image_url(img_url)
+                        if new_url != img_url:
+                            block = {
+                                "type": "image_url",
+                                "image_url": {"url": new_url},
+                            }
+                    new_content.append(block)
+                m = {**m, "content": new_content}
+            resolved.append(m)
+        return resolved
+
     # ---- API 调用 ----
 
     async def chat(self, messages: list[dict]) -> str:
         """发送消息并返回 AI 回复文本"""
         if not self.configured:
             return "⚠️ 插件未配置 API，请在 .env 中设置 CHAT_APIS"
+
+        messages = await self._resolve_messages(messages)
 
         if self._current_type == ApiType.anthropic:
             return await self._chat_anthropic(messages)
@@ -204,7 +297,10 @@ class ChatClient:
             if m["role"] == "system":
                 system_prompt = m["content"]
             else:
-                user_messages.append(m)
+                user_messages.append({
+                    "role": m["role"],
+                    "content": _convert_content_to_anthropic(m["content"]),
+                })
 
         body: dict = {
             "model": self.current_model,
@@ -232,6 +328,8 @@ class ChatClient:
         if not self.configured:
             yield "⚠️ 插件未配置 API，请在 .env 中设置 CHAT_APIS"
             return
+
+        messages = await self._resolve_messages(messages)
 
         if self._current_type == ApiType.anthropic:
             async for chunk in self._chat_stream_anthropic(messages):
@@ -276,7 +374,10 @@ class ChatClient:
             if m["role"] == "system":
                 system_prompt = m["content"]
             else:
-                user_messages.append(m)
+                user_messages.append({
+                    "role": m["role"],
+                    "content": _convert_content_to_anthropic(m["content"]),
+                })
 
         body: dict = {
             "model": self.current_model,

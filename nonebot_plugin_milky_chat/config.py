@@ -43,6 +43,12 @@ class ChatConfig(BaseModel):
         description="系统提示词，定义 AI 的角色和行为",
     )
 
+    # === 功能开关 ===
+    chat_vision_enabled: bool = Field(
+        default=True,
+        description="是否启用识图功能 (将图片发送给 AI 分析)",
+    )
+
     # === 白名单 ===
     chat_allow_groups: str = Field(
         default="",
