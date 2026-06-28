@@ -55,8 +55,9 @@ CHAT_DEFAULT_API=OpenAI
 ### 通用配置
 
 ```env
-# 系统提示词 (可选)
-CHAT_SYSTEM_PROMPT=你是一个友好、乐于助人的 AI 助手。请用简洁清晰的语言回答用户的问题。
+# 系统提示词文件路径，完整路径 (可选，不设置则不使用提示词)
+# 例: CHAT_SYSTEM_PROMPT_FILE=D:\my_prompts\assistant.txt
+CHAT_SYSTEM_PROMPT_FILE=
 
 # 允许响应的 QQ 群号，逗号分隔 (可选，留空=所有群)
 CHAT_ALLOW_GROUPS=

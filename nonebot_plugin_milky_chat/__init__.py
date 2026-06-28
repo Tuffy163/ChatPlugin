@@ -53,11 +53,7 @@ async def on_startup():
     config = ChatConfig(
         chat_apis=getattr(nb_config, "chat_apis", ""),
         chat_default_api=getattr(nb_config, "chat_default_api", ""),
-        chat_system_prompt=getattr(
-            nb_config,
-            "chat_system_prompt",
-            "你是一个友好、乐于助人的 AI 助手。请用简洁清晰的语言回答用户的问题。",
-        ),
+        chat_system_prompt_file=getattr(nb_config, "chat_system_prompt_file", ""),
         chat_vision_enabled=getattr(nb_config, "chat_vision_enabled", True),
         chat_allow_groups=getattr(nb_config, "chat_allow_groups", ""),
         chat_allow_users=getattr(nb_config, "chat_allow_users", ""),

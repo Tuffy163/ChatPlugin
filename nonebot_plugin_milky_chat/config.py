@@ -38,9 +38,9 @@ class ChatConfig(BaseModel):
     )
 
     # === 对话配置 ===
-    chat_system_prompt: str = Field(
-        default="你是一个友好、乐于助人的 AI 助手。请用简洁清晰的语言回答用户的问题。",
-        description="系统提示词，定义 AI 的角色和行为",
+    chat_system_prompt_file: str = Field(
+        default="",
+        description="系统提示词文件路径 (完整路径)。从此文件读取系统提示词，留空则不使用提示词",
     )
     chat_temperature: Optional[float] = Field(
         default=None,
@@ -80,6 +80,27 @@ class ChatConfig(BaseModel):
             import json
             return json.dumps(v, ensure_ascii=False)
         return str(v)
+
+    # === 提示词解析 ===
+
+    @property
+    def resolved_system_prompt(self) -> str:
+        """获取系统提示词。从 CHAT_SYSTEM_PROMPT_FILE 读取，留空则不使用提示词"""
+        file_path = self.chat_system_prompt_file.strip()
+        if not file_path:
+            return ""
+        try:
+            from pathlib import Path
+            path = Path(file_path)
+            if path.is_file():
+                try:
+                    return path.read_text(encoding="utf-8")
+                except UnicodeDecodeError:
+                    return path.read_text()  # 回退系统默认编码 (如 GBK)
+            logger.warning(f"CHAT_SYSTEM_PROMPT_FILE 指定的文件不存在: {file_path}")
+        except Exception as e:
+            logger.warning(f"读取 CHAT_SYSTEM_PROMPT_FILE 失败 ({file_path}): {e}")
+        return ""
 
     # === 白名单辅助 ===
 

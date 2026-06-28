@@ -125,10 +125,11 @@ async def handle_chat(event: Event):
     else:
         user_content = content
 
-    messages = [
-        {"role": "system", "content": client.config.chat_system_prompt},
-        {"role": "user", "content": user_content},
-    ]
+    system_prompt = client.config.resolved_system_prompt
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": user_content})
 
     try:
         reply = await client.chat(messages)

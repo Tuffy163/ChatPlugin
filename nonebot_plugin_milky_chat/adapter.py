@@ -208,7 +208,7 @@ class ChatClient:
             self._client = httpx.AsyncClient(
                 base_url=self._current_base,
                 headers=headers,
-                timeout=httpx.Timeout(60.0),
+                timeout=httpx.Timeout(120.0),
             )
         return self._client
 
@@ -220,7 +220,7 @@ class ChatClient:
             return url
         try:
             async with httpx.AsyncClient(
-                timeout=httpx.Timeout(30.0),
+                timeout=httpx.Timeout(60.0),
                 follow_redirects=True,
                 headers={"User-Agent": "Mozilla/5.0"},
             ) as dl:
